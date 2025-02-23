@@ -18,7 +18,7 @@
             position: absolute; width: 60px; height: 60px; border-radius: 50%;
             background: rgba(255, 0, 0, 0.5); border: 2px solid red;
             bottom: 10px; right: 50%; transform: translateX(50%);
-            touch-action: none;
+            touch-action: none; z-index: 10; /* Ensure it’s on top */
         }
         .knob {
             width: 30px; height: 30px; border-radius: 50%; background: white;
@@ -26,7 +26,7 @@
         }
         #hud {
             position: absolute; top: 10px; left: 10px; color: white;
-            text-shadow: 1px 1px 2px black; font-size: 20px;
+            text-shadow: 1px 1px 2px black; font-size: 20px; z-index: 10;
         }
     </style>
 </head>
@@ -89,7 +89,7 @@
         // Player setup
         camera.position.y = 2;
         const velocity = new THREE.Vector3();
-        const moveSpeed = 0.1; // Reduced for smoother, less twitchy movement
+        const moveSpeed = 0.1;
 
         // Game logic
         let score = 0;
@@ -103,8 +103,7 @@
         const lookJoystick = document.getElementById('lookJoystick');
         const lookKnob = lookJoystick.querySelector('.knob');
         const fireButton = document.getElementById('fireButton');
-        let moveTouchId = null, lookTouchId = null, fireTouchId = null;
-        let moveVector = new THREE.Vector2(), lookVector = new THREE.Vector2();
+        let moveTouchId = null, lookTouchId = null;
 
         function updateJoystick(touch, joystick, knob, vector) {
             const rect = joystick.getBoundingClientRect();
@@ -117,9 +116,10 @@
             vector.set(dx / 40, -dy / 40);
         }
 
+        // Joystick controls
         document.addEventListener('touchstart', (e) => {
             if (gameOver) return;
-            e.preventDefault(); // Prevent scrolling or zooming
+            e.preventDefault();
             for (let touch of e.changedTouches) {
                 if (!moveTouchId && moveJoystick.contains(touch.target)) {
                     moveTouchId = touch.identifier;
@@ -127,9 +127,6 @@
                 } else if (!lookTouchId && lookJoystick.contains(touch.target)) {
                     lookTouchId = touch.identifier;
                     updateJoystick(touch, lookJoystick, lookKnob, lookVector);
-                } else if (!fireTouchId && fireButton.contains(touch.target)) {
-                    fireTouchId = touch.identifier;
-                    shoot();
                 }
             }
         });
@@ -160,15 +157,29 @@
                     lookKnob.style.left = '50%';
                     lookKnob.style.top = '50%';
                     lookVector.set(0, 0);
-                } else if (touch.identifier === fireTouchId) {
-                    fireTouchId = null;
                 }
             }
         });
 
+        // Dedicated fire button handler
+        let isFiring = false;
+        fireButton.addEventListener('touchstart', (e) => {
+            if (gameOver) return;
+            e.preventDefault();
+            if (!isFiring) {
+                isFiring = true;
+                shoot();
+                console.log("Fire button tapped!"); // Debug
+            }
+        });
+        fireButton.addEventListener('touchend', (e) => {
+            if (gameOver) return;
+            e.preventDefault();
+            isFiring = false;
+        });
+
         // Shooting logic
         function shoot() {
-            if (gameOver) return;
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(targets);
@@ -177,12 +188,13 @@
                 scene.remove(hitTarget);
                 targets.splice(targets.indexOf(hitTarget), 1);
                 score += 1;
-                setTimeout(spawnTarget, 500); // Respawn after 0.5s
+                setTimeout(spawnTarget, 500);
             }
         }
 
         // Keyboard controls
         let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let moveVector = new THREE.Vector2(), lookVector = new THREE.Vector2();
         document.addEventListener('keydown', (e) => {
             if (gameOver) return;
             switch (e.code) {
@@ -206,8 +218,8 @@
         // Mouse controls
         let isMouseLocked = false;
         document.addEventListener('click', (e) => {
-            if (gameOver) return;
-            if (!isMouseLocked && !fireButton.contains(e.target)) {
+            if (gameOver || fireButton.contains(e.target)) return;
+            if (!isMouseLocked) {
                 renderer.domElement.requestPointerLock();
                 isMouseLocked = true;
             }
@@ -220,7 +232,7 @@
             }
         });
         document.addEventListener('mousedown', (e) => {
-            if (gameOver) return;
+            if (gameOver || fireButton.contains(e.target)) return;
             if (isMouseLocked && e.button === 0) shoot();
         });
 
@@ -229,12 +241,12 @@
         function animate() {
             requestAnimationFrame(animate);
             const currentTime = performance.now();
-            const delta = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap delta
+            const delta = Math.min((currentTime - lastTime) / 1000, 0.1);
             lastTime = currentTime;
 
             if (!gameOver) {
                 // Movement
-                velocity.x -= velocity.x * 8 * delta; // Lower friction for smoother feel
+                velocity.x -= velocity.x * 8 * delta;
                 velocity.z -= velocity.z * 8 * delta;
                 const moveX = moveVector.x || (moveRight ? 1 : moveLeft ? -1 : 0);
                 const moveZ = moveVector.y || (moveForward ? 1 : moveBackward ? -1 : 0);
@@ -247,8 +259,8 @@
                 if (newZ > -98 && newZ < 98) camera.position.z = newZ;
                 camera.position.y = 2;
 
-                // Look (reduced sensitivity)
-                camera.rotation.y -= lookVector.x * 0.03; // Slower look speed
+                // Look
+                camera.rotation.y -= lookVector.x * 0.03;
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x - lookVector.y * 0.03));
 
                 // Game logic
