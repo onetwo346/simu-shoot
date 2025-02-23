@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D Shooting Sim</title>
+    <title>3D Shooting Sim with Fireballs</title>
     <style>
         body { margin: 0; overflow: hidden; font-family: Arial, sans-serif; }
         canvas { display: block; }
@@ -18,7 +18,7 @@
             position: absolute; width: 60px; height: 60px; border-radius: 50%;
             background: rgba(255, 0, 0, 0.5); border: 2px solid red;
             bottom: 10px; right: 50%; transform: translateX(50%);
-            touch-action: none; z-index: 10; /* Ensure it’s on top */
+            touch-action: none; z-index: 10;
         }
         .knob {
             width: 30px; height: 30px; border-radius: 50%; background: white;
@@ -85,6 +85,11 @@
             targets.push(target);
         }
         for (let i = 0; i < 10; i++) spawnTarget();
+
+        // Fireballs
+        const fireballGeometry = new THREE.SphereGeometry(0.2, 8, 8);
+        const fireballMaterial = new THREE.MeshPhongMaterial({ color: 0xff4500 });
+        const fireballs = [];
 
         // Player setup
         camera.position.y = 2;
@@ -161,35 +166,24 @@
             }
         });
 
-        // Dedicated fire button handler
-        let isFiring = false;
+        // Fire button handler
         fireButton.addEventListener('touchstart', (e) => {
             if (gameOver) return;
             e.preventDefault();
-            if (!isFiring) {
-                isFiring = true;
-                shoot();
-                console.log("Fire button tapped!"); // Debug
-            }
-        });
-        fireButton.addEventListener('touchend', (e) => {
-            if (gameOver) return;
-            e.preventDefault();
-            isFiring = false;
+            shoot();
+            console.log("Fire button pressed - shooting fireball"); // Debug
         });
 
-        // Shooting logic
+        // Shooting logic with fireballs
         function shoot() {
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-            const intersects = raycaster.intersectObjects(targets);
-            if (intersects.length > 0) {
-                const hitTarget = intersects[0].object;
-                scene.remove(hitTarget);
-                targets.splice(targets.indexOf(hitTarget), 1);
-                score += 1;
-                setTimeout(spawnTarget, 500);
-            }
+            const fireball = new THREE.Mesh(fireballGeometry, fireballMaterial);
+            fireball.position.copy(camera.position);
+            const direction = new THREE.Vector3();
+            camera.getWorldDirection(direction);
+            fireball.userData.velocity = direction.clone().multiplyScalar(20); // Speed
+            fireball.userData.lifespan = 2; // 2 seconds
+            scene.add(fireball);
+            fireballs.push(fireball);
         }
 
         // Keyboard controls
@@ -262,6 +256,31 @@
                 // Look
                 camera.rotation.y -= lookVector.x * 0.03;
                 camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x - lookVector.y * 0.03));
+
+                // Fireball movement and collision
+                for (let i = fireballs.length - 1; i >= 0; i--) {
+                    const fb = fireballs[i];
+                    fb.position.addScaledVector(fb.userData.velocity, delta);
+                    fb.userData.lifespan -= delta;
+
+                    // Check collision with targets
+                    for (let j = targets.length - 1; j >= 0; j--) {
+                        const target = targets[j];
+                        if (fb.position.distanceTo(target.position) < 1.2) { // Hit radius
+                            scene.remove(target);
+                            targets.splice(j, 1);
+                            score += 1;
+                            setTimeout(spawnTarget, 500);
+                            break;
+                        }
+                    }
+
+                    // Remove fireball if lifespan ends
+                    if (fb.userData.lifespan <= 0) {
+                        scene.remove(fb);
+                        fireballs.splice(i, 1);
+                    }
+                }
 
                 // Game logic
                 timeLeft -= delta;
