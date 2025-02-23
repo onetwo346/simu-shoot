@@ -89,7 +89,7 @@
         // Player setup
         camera.position.y = 2;
         const velocity = new THREE.Vector3();
-        const moveSpeed = 0.2;
+        const moveSpeed = 0.1; // Reduced for smoother, less twitchy movement
 
         // Game logic
         let score = 0;
@@ -119,6 +119,7 @@
 
         document.addEventListener('touchstart', (e) => {
             if (gameOver) return;
+            e.preventDefault(); // Prevent scrolling or zooming
             for (let touch of e.changedTouches) {
                 if (!moveTouchId && moveJoystick.contains(touch.target)) {
                     moveTouchId = touch.identifier;
@@ -135,6 +136,7 @@
 
         document.addEventListener('touchmove', (e) => {
             if (gameOver) return;
+            e.preventDefault();
             for (let touch of e.touches) {
                 if (touch.identifier === moveTouchId) {
                     updateJoystick(touch, moveJoystick, moveKnob, moveVector);
@@ -146,6 +148,7 @@
 
         document.addEventListener('touchend', (e) => {
             if (gameOver) return;
+            e.preventDefault();
             for (let touch of e.changedTouches) {
                 if (touch.identifier === moveTouchId) {
                     moveTouchId = null;
@@ -165,6 +168,7 @@
 
         // Shooting logic
         function shoot() {
+            if (gameOver) return;
             const raycaster = new THREE.Raycaster();
             raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
             const intersects = raycaster.intersectObjects(targets);
@@ -201,9 +205,9 @@
 
         // Mouse controls
         let isMouseLocked = false;
-        document.addEventListener('click', () => {
+        document.addEventListener('click', (e) => {
             if (gameOver) return;
-            if (!isMouseLocked) {
+            if (!isMouseLocked && !fireButton.contains(e.target)) {
                 renderer.domElement.requestPointerLock();
                 isMouseLocked = true;
             }
@@ -225,13 +229,13 @@
         function animate() {
             requestAnimationFrame(animate);
             const currentTime = performance.now();
-            const delta = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap delta for smoothness
+            const delta = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap delta
             lastTime = currentTime;
 
             if (!gameOver) {
                 // Movement
-                velocity.x -= velocity.x * 10 * delta; // Smooth friction
-                velocity.z -= velocity.z * 10 * delta;
+                velocity.x -= velocity.x * 8 * delta; // Lower friction for smoother feel
+                velocity.z -= velocity.z * 8 * delta;
                 const moveX = moveVector.x || (moveRight ? 1 : moveLeft ? -1 : 0);
                 const moveZ = moveVector.y || (moveForward ? 1 : moveBackward ? -1 : 0);
                 velocity.x += moveX * moveSpeed;
@@ -243,9 +247,9 @@
                 if (newZ > -98 && newZ < 98) camera.position.z = newZ;
                 camera.position.y = 2;
 
-                // Look
-                camera.rotation.y -= lookVector.x * 0.05;
-                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x - lookVector.y * 0.05));
+                // Look (reduced sensitivity)
+                camera.rotation.y -= lookVector.x * 0.03; // Slower look speed
+                camera.rotation.x = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, camera.rotation.x - lookVector.y * 0.03));
 
                 // Game logic
                 timeLeft -= delta;
